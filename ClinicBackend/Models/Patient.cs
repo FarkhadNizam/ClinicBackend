@@ -14,6 +14,4 @@ namespace ClinicBackend.Models
         public string? InsuranceNumber { get; set; }
         public ICollection<Appointment> Appointments { get; set; }
     }
-
-
 }

@@ -23,7 +23,7 @@ namespace ClinicBackend.Controllers
 
         [HttpPost]
         public async Task<IActionResult> CreateAppointment(
-            [FromBody] CreateAppointmentDTO request)
+            [FromBody] AppointmentDTO request)
         {
             try
             {
@@ -80,13 +80,5 @@ namespace ClinicBackend.Controllers
             }
         }
 
-    }   
-
-    public class CreateAppointmentDTO
-    {
-        public Guid PatientId { get; set; }
-        public Guid DoctorId { get; set; }
-        public DateTime Date { get; set; }
-        public DateTime Time { get; set; }
-    }
+    }       
 }

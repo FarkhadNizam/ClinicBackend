@@ -1,9 +1,7 @@
 ﻿namespace ClinicBackend.Models
 {
     public class Appointment
-    {
-        // If status = booked and no slot => waitinglist
-
+    {        
         public Guid Id { get; set; }
         public Guid PatientId { get; set; }
         public Guid DoctorId { get; set; }
@@ -14,9 +12,23 @@
         public Doctor Doctor { get; set; }
         public ScheduleSlot ScheduleSlot { get; set; }
 
+        public DateTime? StatusUpdatedAt { get; set; }
         public Status status { get; set; }
+        public CancelReason? cancelReason { get; set; }
+
         public DateTime? ActualStartTime { get; set; }
         public DateTime? ActualEndTime { get; set; }
+
+        public enum CancelReason
+        {
+            None,
+            PatientRequest,
+            DoctorUnavailable,
+            Emergency,
+            DuplicateBooking,
+            TechnicalIssue,
+            Other
+        }        
 
         public enum Status
         {

@@ -7,8 +7,8 @@
         public Appointment Appointment { get; set; }
         public DateTime Date { get; set; }
         public string Complaints { get; set; }
-        public string Diagnosis { get; set; }
+        public Guid DiagnosisId { get; set; }
+        public Diagnosis Diagnosis { get; set; }
         public string Treatment { get; set; }
     }
-
 }

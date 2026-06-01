@@ -13,6 +13,9 @@ namespace ClinicBackend.Data
         public DbSet<ScheduleSlot> ScheduleSlots { get; set; }
         public DbSet<MedicalVisit> MedicalVisits { get; set; }
         public DbSet<Appointment> Appointments { get; set; }
+        public DbSet<Specialty> Specialties { get; set; }
+        public DbSet<WaitingListEntry> WaitingListEntries { get; set; }
+        public DbSet<Diagnosis> Diagnoses { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
