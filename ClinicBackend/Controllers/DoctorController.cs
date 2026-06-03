@@ -37,7 +37,7 @@ namespace ClinicBackend.Controllers
 
                 var doctor = new Doctor
                 {
-                    Id = Guid.NewGuid().ToString(),
+                    Id = Guid.NewGuid(),
                     FirstName = doctorDto.FirstName,
                     LastName = doctorDto.LastName,
                     Specialty = doctorDto.Specialty
@@ -79,7 +79,7 @@ namespace ClinicBackend.Controllers
         }
 
         [HttpGet("available-dates/{doctorId}")]
-        public async Task<ActionResult<IEnumerable<string>>> GetAvailableDates(string doctorId)
+        public async Task<ActionResult<IEnumerable<string>>> GetAvailableDates(Guid doctorId)
         {
             var dates = await _context.ScheduleSlots
                 .Where(s => s.DoctorId == doctorId && s.IsAvailable)
@@ -92,8 +92,8 @@ namespace ClinicBackend.Controllers
 
         [HttpGet("available-times/{doctorId}/{date}")]
         public async Task<ActionResult<IEnumerable<string>>> GetAvailableTimes(
-            string doctorId,
-            string date)
+            Guid doctorId,
+            DateTime date)
         {
             var times = await _context.ScheduleSlots
                 .Where(s => s.DoctorId == doctorId &&

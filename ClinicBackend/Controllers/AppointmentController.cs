@@ -53,7 +53,7 @@ namespace ClinicBackend.Controllers
                 {
                     Id = Guid.NewGuid(),
                     PatientId = request.PatientId,
-                    DoctorId = new Guid(request.DoctorId),
+                    DoctorId = request.DoctorId,
                     ScheduleSlotId = slot.Id,
                     CreatedAt = DateTime.UtcNow
                 };
@@ -84,9 +84,9 @@ namespace ClinicBackend.Controllers
 
     public class CreateAppointmentDTO
     {
-        public string PatientId { get; set; }
-        public string DoctorId { get; set; }
-        public string Date { get; set; }
-        public string Time { get; set; }
+        public Guid PatientId { get; set; }
+        public Guid DoctorId { get; set; }
+        public DateTime Date { get; set; }
+        public DateTime Time { get; set; }
     }
 }

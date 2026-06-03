@@ -3,7 +3,6 @@ using ClinicBackend.Models;
 using ClinicBackend.DTO;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using ClinicBackend.DTO;
 
 namespace ClinicBackend.Controllers
 {
@@ -32,14 +31,8 @@ namespace ClinicBackend.Controllers
                     return NotFound("Врач не найден");
                 }
 
-                // Валидация времени
-                if (!TimeSpan.TryParse(request.StartTime, out var startTime) ||
-                    !TimeSpan.TryParse(request.EndTime, out var endTime))
-                {
-                    return BadRequest("Некорректный формат времени");
-                }
 
-                if (startTime >= endTime)
+                if (request.StartTime >= request.EndTime)
                 {
                     return BadRequest("Время окончания должно быть позже времени начала");
                 }
@@ -62,8 +55,8 @@ namespace ClinicBackend.Controllers
                 // Генерация слотов
                 var generatedSlots = GenerateTimeSlots(
                     request.Date,
-                    startTime,
-                    endTime,
+                    request.StartTime,
+                    request.EndTime,
                     request.DurationMinutes,
                     request.DoctorId);
 
@@ -85,11 +78,11 @@ namespace ClinicBackend.Controllers
         }
 
         private List<ScheduleSlot> GenerateTimeSlots(
-            string date,
-            TimeSpan startTime,
-            TimeSpan endTime,
+            DateTime date,
+            DateTime startTime,
+            DateTime endTime,
             int durationMinutes,
-            string doctorId)
+            Guid doctorId)
         {
             var slots = new List<ScheduleSlot>();
             var currentTime = startTime;
@@ -99,11 +92,11 @@ namespace ClinicBackend.Controllers
             {
                 slots.Add(new ScheduleSlot
                 {
-                    Id = Guid.NewGuid().ToString(),
+                    Id = Guid.NewGuid(),
                     DoctorId = doctorId,
                     Date = date,
-                    TimeFrom = currentTime.ToString(@"hh\:mm"),
-                    TimeTo = (currentTime + duration).ToString(@"hh\:mm"),
+                    TimeFrom = currentTime,
+                    TimeTo = currentTime + duration,
                     IsAvailable = true
                 });
 

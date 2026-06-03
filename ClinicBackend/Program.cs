@@ -2,7 +2,6 @@ using ClinicBackend.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
-using YourNamespace.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 

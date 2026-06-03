@@ -22,12 +22,12 @@ public class DoctorsController : ControllerBase
     {
         var doctorId = "71b501ff-49ae-4601-8c44-c77fcffb047a";
 
-        var doctor = await _context.Doctors.FirstOrDefaultAsync(d => d.Id == doctorId);
+        var doctor = await _context.Doctors.FirstOrDefaultAsync(d => d.Id == new Guid(doctorId));
         if (doctor == null) return NotFound();
 
         return Ok(new DoctorDto
         {
-            Id = Guid.Parse(doctor.Id),
+            Id = doctor.Id,
             FirstName = doctor.FirstName,
             LastName = doctor.LastName,
             Specialty = doctor.Specialty
@@ -62,10 +62,10 @@ public class DoctorsController : ControllerBase
 public class AppointmentDto
 {
     public Guid Id { get; set; }
-    public string PatientId { get; set; }
+    public Guid PatientId { get; set; }
     public string PatientName { get; set; }
-    public string Date { get; set; }
-    public string Time { get; set; }
+    public DateTime Date { get; set; }
+    public DateTime Time { get; set; }
 }
 
 // DTOs/DoctorDto.cs
