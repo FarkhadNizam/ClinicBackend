@@ -126,32 +126,82 @@ namespace ClinicBackend.Controllers
         }
 
         // ========== Приёмы текущего врача ==========
-        [HttpGet("appointments")]
-        public async Task<ActionResult<List<AppointmentDTO>>> GetDoctorAppointments()
-        {
-            var doctorId = Guid.Parse("71b501ff-49ae-4601-8c44-c77fcffb047a"); // TODO: брать из User.Claims
+        //[HttpGet("appointments")]
+        //public async Task<ActionResult<List<AppointmentDTO>>> GetDoctorAppointments()
+        //{
+        //    var doctorId = Guid.Parse("71b501ff-49ae-4601-8c44-c77fcffb047a"); // TODO: брать из User.Claims
 
-            var appointments = await _context.Appointments
-                .Where(a => a.DoctorId == doctorId)
-                .Include(a => a.Patient)
-                .Include(a => a.ScheduleSlot)
-                .OrderBy(a => a.ScheduleSlot.Date)
-                .ThenBy(a => a.ScheduleSlot.TimeFrom)
-                .Select(a => new AppointmentDTO
+        //    var appointments = await _context.Appointments
+        //        .Where(a => a.DoctorId == doctorId)
+        //        .Include(a => a.Patient)
+        //        .Include(a => a.ScheduleSlot)
+        //        .OrderBy(a => a.ScheduleSlot.Date)
+        //        .ThenBy(a => a.ScheduleSlot.TimeFrom)
+        //        .Select(a => new AppointmentDTO
+        //        {
+        //            Id = a.Id,
+        //            PatientId = a.PatientId,
+        //            //PatientName = $"{a.Patient.LastName} {a.Patient.FirstName}",
+        //            Date = a.ScheduleSlot.Date,
+        //            Time = a.ScheduleSlot.TimeFrom,
+        //            //Status = a.status
+        //        })
+        //        .ToListAsync();
+
+        //    return Ok(appointments);
+        //}
+
+        // ========== Маппинг (чтобы не дублировать) ==========
+
+        [HttpGet("{doctorId}/slots")]
+        public async Task<ActionResult<List<ScheduleSlotDTO>>> GetDoctorSlots(
+    Guid doctorId)
+        {
+            var slots = await _context.ScheduleSlots
+                .Where(s =>
+                    s.DoctorId == doctorId &&
+                    s.IsAvailable)
+                .OrderBy(s => s.Date)
+                .ThenBy(s => s.TimeFrom)
+                .Select(s => new ScheduleSlotDTO
                 {
-                    Id = a.Id,
-                    PatientId = a.PatientId,
-                    //PatientName = $"{a.Patient.LastName} {a.Patient.FirstName}",
-                    Date = a.ScheduleSlot.Date,
-                    Time = a.ScheduleSlot.TimeFrom,
-                    //Status = a.status
+                    Id = s.Id,
+                    Date = s.Date,
+                    TimeFrom = s.TimeFrom,
+                    TimeTo = s.TimeTo
                 })
                 .ToListAsync();
 
-            return Ok(appointments);
+            return Ok(slots);
         }
 
-        // ========== Маппинг (чтобы не дублировать) ==========
+        [HttpGet("specialty/{specialtyId}/availability")]
+        public async Task<ActionResult<List<DoctorAvailabilityDto>>> GetAvailabilityBySpecialty(Guid specialtyId)
+        {
+            var doctors = await _context.Doctors
+                .Where(d => d.SpecialtyId == specialtyId)
+                .Select(d => new DoctorAvailabilityDto
+                {
+                    DoctorId = d.Id,
+
+                    FirstName = d.FirstName,
+
+                    LastName = d.LastName,
+
+                    AvailableSlotsCount =
+                        d.Slots.Count(s => s.IsAvailable),
+
+                    NearestSlot =
+                        d.Slots
+                            .Where(s => s.IsAvailable)
+                            .OrderBy(s => s.TimeFrom)
+                            .Select(s => (DateTime?)s.TimeFrom)
+                            .FirstOrDefault()
+                })
+                .ToListAsync();
+
+            return Ok(doctors);
+        }
         private static DoctorDto MapToDoctorDto(Models.Doctor doctor)
         {
             return new DoctorDto

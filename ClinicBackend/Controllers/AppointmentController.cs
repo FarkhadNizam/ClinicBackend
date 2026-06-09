@@ -19,66 +19,80 @@ namespace ClinicBackend.Controllers
         {
             _context = context;
             _logger = logger;
-        }
+        }        
 
         [HttpPost]
-        public async Task<IActionResult> CreateAppointment(
-            [FromBody] AppointmentDTO request)
+        public async Task<IActionResult> CreateAppointment(CreateAppointmentDTO request)
         {
-            try
-            {
-                // Проверяем существование пациента
-                var patient = await _context.Patients.FindAsync(request.PatientId);
-                if (patient == null)
-                    return NotFound("Пациент не найден");
+            var patient =
+                await _context.Patients.FindAsync(
+                    request.PatientId);
 
-                // Проверяем существование врача
-                var doctor = await _context.Doctors.FindAsync(request.DoctorId);
-                if (doctor == null)
-                    return NotFound("Врач не найден");
+            if (patient == null)
+                return NotFound("Пациент не найден");
 
-                // Находим доступный слот
-                var slot = await _context.ScheduleSlots
-                    .FirstOrDefaultAsync(s =>
-                        s.DoctorId == request.DoctorId &&
-                        s.Date == request.Date &&
-                        s.TimeFrom == request.Time &&
-                        s.IsAvailable);
+            var slot =
+                await _context.ScheduleSlots
+                    .Include(s => s.Doctor)
+                    .FirstOrDefaultAsync(
+                        s => s.Id ==
+                        request.ScheduleSlotId);
 
-                if (slot == null)
-                    return BadRequest("Выбранный слот недоступен");
+            if (slot == null)
+                return NotFound("Слот не найден");
 
-                // Создаем запись
-                var appointment = new Appointment
+            if (!slot.IsAvailable)
+                return BadRequest(
+                    "Слот уже занят");
+
+            var duplicate =
+                await _context.Appointments
+                    .Include(a => a.ScheduleSlot)
+                    .AnyAsync(a =>
+                        a.PatientId ==
+                        request.PatientId &&
+                        a.ScheduleSlot.Date ==
+                        slot.Date &&
+                        a.ScheduleSlot.TimeFrom ==
+                        slot.TimeFrom &&
+                        a.status !=
+                        Appointment.Status.Canceled);
+
+            if (duplicate)
+                return BadRequest(
+                    "Пациент уже записан");
+
+            var appointment =
+                new Appointment
                 {
                     Id = Guid.NewGuid(),
-                    PatientId = request.PatientId,
-                    DoctorId = request.DoctorId,
+                    PatientId = patient.Id,
+                    DoctorId = slot.DoctorId,
                     ScheduleSlotId = slot.Id,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.UtcNow,
+                    StatusUpdatedAt = DateTime.UtcNow,
+                    status =
+                        Appointment.Status.Planned
                 };
 
-                // Помечаем слот как занятый
-                slot.IsAvailable = false;
+            slot.IsAvailable = false;
 
-                await _context.Appointments.AddAsync(appointment);
-                await _context.SaveChangesAsync();
+            _context.Appointments.Add(
+                appointment);
 
-                return Ok(new
-                {
-                    Id = appointment.Id,
-                    PatientName = $"{patient.LastName} {patient.FirstName}",
-                    DoctorName = $"{doctor.LastName} {doctor.FirstName}",
-                    Date = request.Date,
-                    Time = request.Time
-                });
-            }
-            catch (Exception ex)
+            await _context.SaveChangesAsync();
+
+            return Ok(new
             {
-                _logger.LogError(ex, "Ошибка при создании записи");
-                return StatusCode(500, "Произошла ошибка при создании записи");
-            }
-        }
+                Id = appointment.Id,
+                PatientId = appointment.PatientId,
+                DoctorId = appointment.DoctorId,
+                ScheduleSlotId = appointment.ScheduleSlotId,
+                CreatedAt = appointment.CreatedAt,
+                Status = appointment.status.ToString()
+            });
+        } 
+        
 
     }       
 }
