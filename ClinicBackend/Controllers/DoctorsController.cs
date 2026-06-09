@@ -21,39 +21,63 @@ namespace ClinicBackend.Controllers
 
         // ========== Создание врача ==========
         [HttpPost]
-        public async Task<IActionResult> CreateDoctor([FromBody] DTO.CreateDoctorDTO doctorDto)
+        public async Task<IActionResult> CreateDoctor([FromBody] CreateDoctorDTO dto)
         {
-            try
+            if (await _context.Users.AnyAsync(
+                x => x.Login == dto.Login))
             {
-                if (!ModelState.IsValid)
-                    return BadRequest(ModelState);
-
-                if (await _context.Doctors.AnyAsync(d =>
-                    d.FirstName == doctorDto.FirstName &&
-                    d.LastName == doctorDto.LastName))
-                {
-                    return Conflict("Врач с таким именем и фамилией уже существует");
-                }
-
-                var doctor = new Models.Doctor
-                {
-                    Id = Guid.NewGuid(),
-                    FirstName = doctorDto.FirstName,
-                    LastName = doctorDto.LastName,
-                    SpecialtyId = doctorDto.SpecialtyId,
-                    // ExperienceYears, PlannedWeeklyHours и т.д. — добавь позже
-                };
-
-                await _context.Doctors.AddAsync(doctor);
-                await _context.SaveChangesAsync();
-
-                return CreatedAtAction(nameof(GetDoctor), new { id = doctor.Id }, doctor);
+                return Conflict(
+                    "Логин уже существует");
             }
-            catch (Exception ex)
+
+            var tempPassword =
+                PasswordGenerator.Generate();
+
+            var user = new User
             {
-                _logger.LogError(ex, "Ошибка при создании врача");
-                return StatusCode(500, "Произошла внутренняя ошибка сервера");
-            }
+                Id = Guid.NewGuid(),
+
+                Login = dto.Login,
+
+                PasswordHash =
+                    BCrypt.Net.BCrypt.HashPassword(
+                        tempPassword),
+
+                Role = UserRole.Doctor,                
+            };
+
+            var doctor = new Doctor
+            {
+                Id = Guid.NewGuid(),
+
+                UserId = user.Id,
+
+                FirstName = dto.FirstName,
+
+                LastName = dto.LastName,
+
+                SpecialtyId = dto.SpecialtyId,
+
+                PlannedWeeklyHours =
+                    dto.PlannedWeeklyHours
+            };
+
+            _context.Users.Add(user);
+
+            _context.Doctors.Add(doctor);
+
+            await _context.SaveChangesAsync();
+
+            return Ok(
+                new DoctorCreatedDTO
+                {
+                    DoctorId = doctor.Id,
+
+                    Login = user.Login,
+
+                    TemporaryPassword =
+                        tempPassword
+                });
         }
 
         // ========== Получение одного врача ==========
@@ -61,7 +85,7 @@ namespace ClinicBackend.Controllers
         public async Task<ActionResult<DoctorDto>> GetDoctor(Guid id)
         {
             var doctor = await _context.Doctors
-                .Include(d => d.Specialty)           // ← полезно
+                .Include(d => d.Specialty)         
                 .FirstOrDefaultAsync(d => d.Id == id);
 
             if (doctor == null) return NotFound();
@@ -154,8 +178,7 @@ namespace ClinicBackend.Controllers
         // ========== Маппинг (чтобы не дублировать) ==========
 
         [HttpGet("{doctorId}/slots")]
-        public async Task<ActionResult<List<ScheduleSlotDTO>>> GetDoctorSlots(
-    Guid doctorId)
+        public async Task<ActionResult<List<ScheduleSlotDTO>>> GetDoctorSlots(Guid doctorId)
         {
             var slots = await _context.ScheduleSlots
                 .Where(s =>
@@ -212,6 +235,26 @@ namespace ClinicBackend.Controllers
                 SpecialtyId = doctor.SpecialtyId,
                 SpecialtyName = doctor.Specialty?.Name
             };
+        }
+
+        public static class PasswordGenerator
+        {
+            private const string Chars =
+                "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+
+            public static string Generate(
+                int length = 10)
+            {
+                var random = new Random();
+
+                return new string(
+                    Enumerable.Repeat(
+                        Chars,
+                        length)
+                    .Select(s =>
+                        s[random.Next(s.Length)])
+                    .ToArray());
+            }
         }
     }    
 }
