@@ -18,6 +18,7 @@
 
         public DateTime? ActualStartTime { get; set; }
         public DateTime? ActualEndTime { get; set; }
+        public MedicalVisit? MedicalVisit { get; set; }
 
         public enum CancelReason
         {
