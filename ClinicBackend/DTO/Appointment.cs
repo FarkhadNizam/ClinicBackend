@@ -7,6 +7,23 @@
         public Guid ScheduleSlotId { get; set; }
     }
 
+    public class AppointmentDTO
+    {
+        public Guid Id { get; set; }
+
+        public Guid PatientId { get; set; }
+
+        public string PatientName { get; set; }
+
+        public int PatientAge { get; set; }
+
+        public DateTime Date { get; set; }
+
+        public DateTime Time { get; set; }
+
+        public string Status { get; set; }
+    }
+
     public class ScheduleSlotDTO
     {
         public Guid Id { get; set; }

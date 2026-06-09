@@ -1,8 +1,10 @@
 ﻿using ClinicBackend.Data;
 using ClinicBackend.DTO;
 using ClinicBackend.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace ClinicBackend.Controllers
 {
@@ -149,33 +151,58 @@ namespace ClinicBackend.Controllers
             return Ok(times);
         }
 
-        // ========== Приёмы текущего врача ==========
-        //[HttpGet("appointments")]
-        //public async Task<ActionResult<List<AppointmentDTO>>> GetDoctorAppointments()
-        //{
-        //    var doctorId = Guid.Parse("71b501ff-49ae-4601-8c44-c77fcffb047a"); // TODO: брать из User.Claims
+        [Authorize(Roles = "Doctor")]
+        [HttpGet("appointments")]
+        public async Task<ActionResult<List<AppointmentDTO>>>GetDoctorAppointments()
+        {
+            var userId = Guid.Parse(
+                User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-        //    var appointments = await _context.Appointments
-        //        .Where(a => a.DoctorId == doctorId)
-        //        .Include(a => a.Patient)
-        //        .Include(a => a.ScheduleSlot)
-        //        .OrderBy(a => a.ScheduleSlot.Date)
-        //        .ThenBy(a => a.ScheduleSlot.TimeFrom)
-        //        .Select(a => new AppointmentDTO
-        //        {
-        //            Id = a.Id,
-        //            PatientId = a.PatientId,
-        //            //PatientName = $"{a.Patient.LastName} {a.Patient.FirstName}",
-        //            Date = a.ScheduleSlot.Date,
-        //            Time = a.ScheduleSlot.TimeFrom,
-        //            //Status = a.status
-        //        })
-        //        .ToListAsync();
+            var doctor = await _context.Doctors
+                .FirstOrDefaultAsync(
+                    d => d.UserId == userId);
 
-        //    return Ok(appointments);
-        //}
+            if (doctor == null)
+                return NotFound();
 
-        // ========== Маппинг (чтобы не дублировать) ==========
+            var appointments =
+                await _context.Appointments
+                    .Where(a =>
+                        a.DoctorId == doctor.Id)
+                    .Include(a => a.Patient)
+                    .Include(a => a.ScheduleSlot)
+                    .OrderBy(a => a.ScheduleSlot.Date)
+                    .ThenBy(a => a.ScheduleSlot.TimeFrom)
+                    .Select(a =>
+                        new AppointmentDTO
+                        {
+                            Id = a.Id,
+
+                            PatientId =
+                                a.PatientId,
+
+                            PatientName =
+                                a.Patient.LastName +
+                                " " +
+                                a.Patient.FirstName,
+
+                            PatientAge =
+                                DateTime.Now.Year -
+                                a.Patient.BirthDate.Year,
+
+                            Date =
+                                a.ScheduleSlot.Date,
+
+                            Time =
+                                a.ScheduleSlot.TimeFrom,
+
+                            Status =
+                                a.status.ToString()
+                        })
+                    .ToListAsync();
+
+            return Ok(appointments);
+        }
 
         [HttpGet("{doctorId}/slots")]
         public async Task<ActionResult<List<ScheduleSlotDTO>>> GetDoctorSlots(Guid doctorId)
