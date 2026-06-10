@@ -4,14 +4,11 @@
     {
         public string Complaints { get; set; }
         public Guid DiagnosisId { get; set; }
-        public string Treatment { get; set; }
-        public string Status { get; set; }
+        public string Treatment { get; set; }        
     }
 
     public class CreateMedicalVisitDto
-    {
-        public Guid AppointmentId { get; set; }
-
+    {        
         public string Complaints { get; set; }
 
         public Guid DiagnosisId { get; set; }

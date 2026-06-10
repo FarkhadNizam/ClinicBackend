@@ -17,150 +17,118 @@ public class MedicalVisitsController : ControllerBase
     }
 
     [HttpGet("{appointmentId}/visit")]
-    public async Task<IActionResult> GetVisit(
-    Guid appointmentId)
+    public async Task<IActionResult> GetVisit(Guid appointmentId)
     {
-        var appointment =
-            await _context.Appointments
-                .Include(a => a.Patient)
-                .Include(a => a.Doctor)
-                .Include(a => a.MedicalVisit)
-                    .ThenInclude(v => v.Diagnosis)
-                .FirstOrDefaultAsync(
-                    a => a.Id == appointmentId);
+        var appointment = await _context.Appointments
+            .Include(a => a.Patient)
+            .Include(a => a.MedicalVisit)
+                .ThenInclude(v => v!.Diagnosis)
+            .FirstOrDefaultAsync(a => a.Id == appointmentId);
 
         if (appointment == null)
             return NotFound();
 
-        var currentVisitId = appointment.MedicalVisit?.Id;
+        // ========== История визитов ==========
+        var historyQuery = _context.MedicalVisits
+            .Include(v => v.Appointment)
+                .ThenInclude(a => a.Doctor)
+            .Include(v => v.Diagnosis)
+            .Where(v => v.Appointment.PatientId == appointment.PatientId);
 
-        var history =
-            await _context.MedicalVisits
-                .Include(v => v.Appointment)
-                    .ThenInclude(a => a.Doctor)
-                .Include(v => v.Diagnosis)
-                .Where(v =>
-                    v.Appointment.PatientId == appointment.PatientId &&
-                    v.Id != currentVisitId)
-                .OrderByDescending(v => v.Date)
-                .Take(20)
-                .Select(v => new MedicalVisitHistoryDto
-                {
-                    Id = v.Id,
-                    Date = v.Date,
-                    Complaints = v.Complaints,
-                    Treatment = v.Treatment,
-                    DiagnosisName = v.Diagnosis.Name,
-                    DoctorName = v.Appointment.Doctor.LastName
-                })
-                .ToListAsync();
+        // Исключаем текущий визит, если он уже существует
+        if (appointment.MedicalVisit != null)
+        {
+            historyQuery = historyQuery.Where(v => v.Id != appointment.MedicalVisit.Id);
+        }
 
-        var result =
-            new AppointmentVisitDto
+        var history = await historyQuery
+            .OrderByDescending(v => v.Date)
+            .Take(20)
+            .Select(v => new MedicalVisitHistoryDto
             {
-                AppointmentId = appointment.Id,
+                Id = v.Id,
+                Date = v.Date,
+                Complaints = v.Complaints,
+                Treatment = v.Treatment,
+                DiagnosisName = v.Diagnosis != null ? v.Diagnosis.Name : null,
+                DoctorName = $"{v.Appointment.Doctor.LastName} {v.Appointment.Doctor.FirstName}"
+            })
+            .ToListAsync();
 
-                Patient = new PatientDto
-                {
-                    Id = appointment.Patient.Id,
-                    FirstName = appointment.Patient.FirstName,
-                    LastName = appointment.Patient.LastName,
-                    BirthDate = appointment.Patient.BirthDate,
-                    Phone = appointment.Patient.Phone,
-                    InsuranceNumber =
-                        appointment.Patient.InsuranceNumber
-                },
+        // ========== Формируем ответ ==========
+        var result = new AppointmentVisitDto
+        {
+            AppointmentId = appointment.Id,
 
-                Visit =
-                    appointment.MedicalVisit == null
-                    ? null
-                    : new MedicalVisitDto
-                    {
-                        Id =
-                            appointment.MedicalVisit.Id,
+            Patient = new PatientDto
+            {
+                Id = appointment.Patient.Id,
+                FirstName = appointment.Patient.FirstName,
+                LastName = appointment.Patient.LastName,
+                BirthDate = appointment.Patient.BirthDate,
+                Phone = appointment.Patient.Phone,
+                InsuranceNumber = appointment.Patient.InsuranceNumber
+            },
 
-                        Date =
-                            appointment.MedicalVisit.Date,
+            Visit = appointment.MedicalVisit == null ? null : new MedicalVisitDto
+            {
+                Id = appointment.MedicalVisit.Id,
+                Date = appointment.MedicalVisit.Date,
+                Complaints = appointment.MedicalVisit.Complaints,
+                Treatment = appointment.MedicalVisit.Treatment,
+                DiagnosisId = appointment.MedicalVisit.DiagnosisId,
+                DiagnosisName = appointment.MedicalVisit.Diagnosis?.Name,
+                DiagnosisCode = appointment.MedicalVisit.Diagnosis?.MkbCode
+            },
 
-                        Complaints =
-                            appointment.MedicalVisit.Complaints,
-
-                        Treatment =
-                            appointment.MedicalVisit.Treatment,
-
-                        DiagnosisId =
-                            appointment.MedicalVisit.DiagnosisId,
-
-                        DiagnosisName =
-                            appointment.MedicalVisit
-                                .Diagnosis?.Name,
-
-                        DiagnosisCode =
-                            appointment.MedicalVisit
-                                .Diagnosis?.MkbCode
-                    },
-
-                History = history
-            };
+            History = history
+        };
 
         return Ok(result);
     }
 
     [HttpPost("{appointmentId}/visit")]
-    public async Task<IActionResult> CreateVisit(Guid appointmentId,
-    CreateMedicalVisitDto dto)
+    public async Task<IActionResult> CreateVisit(Guid appointmentId, [FromBody] CreateMedicalVisitDto dto)
     {
-        var appointment =
-            await _context.Appointments
-                .FirstOrDefaultAsync(
-                    a => a.Id == appointmentId);
+        var appointment = await _context.Appointments
+            .FirstOrDefaultAsync(a => a.Id == appointmentId);
 
-        if (appointment == null)
-            return NotFound();
-
-        if (appointment.MedicalVisit != null)
-            return BadRequest(
-                "Прием уже оформлен");
+        if (appointment == null) return NotFound();
+        if (appointment.MedicalVisit != null) return BadRequest("Прием уже оформлен");
 
         var visit = new MedicalVisit
         {
             Id = Guid.NewGuid(),
-
             AppointmentId = appointmentId,
-
             Complaints = dto.Complaints,
-
             DiagnosisId = dto.DiagnosisId,
-
             Treatment = dto.Treatment,
-
             Date = DateTime.UtcNow
         };
 
-        appointment.status =
-            Appointment.Status.Completed;
+        appointment.status = Appointment.Status.Completed;
 
         _context.MedicalVisits.Add(visit);
-
         await _context.SaveChangesAsync();
 
         return Ok();
     }
 
     [HttpPut("{appointmentId}/visit")]
-    public async Task<ActionResult> UpdateVisit(string id, [FromBody] UpdateMedicalVisitDto visitDto)
+    public async Task<IActionResult> UpdateVisit(Guid appointmentId, [FromBody] UpdateMedicalVisitDto dto)
     {
-        var existing = await _context.MedicalVisits.FindAsync(id);
-        if (existing == null)
-        {
-            return NotFound();
-        }
+        var visit = await _context.MedicalVisits
+            .FirstOrDefaultAsync(v => v.AppointmentId == appointmentId);
 
-        existing.Complaints = visitDto.Complaints;
-        existing.DiagnosisId = visitDto.DiagnosisId;
-        existing.Treatment = visitDto.Treatment;        
+        if (visit == null) return NotFound("Прием не найден");
+
+        visit.Complaints = dto.Complaints;
+        visit.DiagnosisId = dto.DiagnosisId;
+        visit.Treatment = dto.Treatment;
+        visit.Date = DateTime.UtcNow; // обновляем дату редактирования
 
         await _context.SaveChangesAsync();
+
         return Ok();
     }    
 }
