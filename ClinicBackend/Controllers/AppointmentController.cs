@@ -91,8 +91,68 @@ namespace ClinicBackend.Controllers
                 CreatedAt = appointment.CreatedAt,
                 Status = appointment.status.ToString()
             });
-        } 
-        
+        }
 
+        [HttpGet]
+        public async Task<ActionResult<List<AppointmentListDto>>> GetAppointments()
+        {
+            var appointments =
+                await _context.Appointments
+                    .Include(a => a.Patient)
+                    .Include(a => a.Doctor)
+                        .ThenInclude(d => d.Specialty)
+                    .Include(a => a.ScheduleSlot)
+                    .OrderBy(a => a.ScheduleSlot.Date)
+                    .ThenBy(a => a.ScheduleSlot.TimeFrom)
+                    .Select(a => new AppointmentListDto
+                    {
+                        Id = a.Id,
+
+                        PatientName =
+                            a.Patient.LastName + " " +
+                            a.Patient.FirstName,
+
+                        DoctorName =
+                            a.Doctor.LastName + " " +
+                            a.Doctor.FirstName,
+
+                        SpecialtyName =
+                            a.Doctor.Specialty.Name,
+
+                        Date =
+                            a.ScheduleSlot.Date,
+
+                        TimeFrom =
+                            a.ScheduleSlot.TimeFrom,
+
+                        TimeTo =
+                            a.ScheduleSlot.TimeTo,
+
+                        Status =
+                            a.status,
+
+                    })
+                    .ToListAsync();
+
+            return Ok(appointments);
+        }
+
+        [HttpPut("{id}/cancel")]
+        public async Task<IActionResult> CancelAppointment(Guid id)
+        {
+            var appointment =
+                await _context.Appointments
+                    .FirstOrDefaultAsync(a => a.Id == id);
+
+            if (appointment == null)
+                return NotFound();
+
+            appointment.status =
+                Appointment.Status.Canceled;
+
+            await _context.SaveChangesAsync();
+
+            return Ok();
+        }
     }       
 }
