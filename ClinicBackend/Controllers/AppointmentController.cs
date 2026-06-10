@@ -116,6 +116,8 @@ namespace ClinicBackend.Controllers
                             a.Doctor.LastName + " " +
                             a.Doctor.FirstName,
 
+                        patientPhone = a.Patient.Phone,
+
                         SpecialtyName =
                             a.Doctor.Specialty.Name,
 
@@ -142,13 +144,43 @@ namespace ClinicBackend.Controllers
         {
             var appointment =
                 await _context.Appointments
+                    .Include(a => a.ScheduleSlot)
                     .FirstOrDefaultAsync(a => a.Id == id);
 
             if (appointment == null)
                 return NotFound();
 
+            if (appointment.status != Appointment.Status.Planned)
+                return BadRequest(
+                    "Отменить можно только запланированную запись");
+
             appointment.status =
                 Appointment.Status.Canceled;
+
+            appointment.ScheduleSlot.IsAvailable = true;
+
+            await _context.SaveChangesAsync();
+
+            return Ok();
+        }
+
+        [HttpPut("{id}/no-show")]
+        public async Task<IActionResult> MarkNoShow(Guid id)
+        {
+            var appointment =
+                await _context.Appointments
+                    .Include(a => a.ScheduleSlot)
+                    .FirstOrDefaultAsync(a => a.Id == id);
+
+            if (appointment == null)
+                return NotFound();
+
+            if (appointment.status != Appointment.Status.Planned)
+                return BadRequest(
+                    "Только запланированную запись можно отметить как неявку");
+
+            appointment.status =
+                Appointment.Status.NoShow;
 
             await _context.SaveChangesAsync();
 

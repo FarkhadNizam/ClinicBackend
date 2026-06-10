@@ -63,6 +63,8 @@ namespace ClinicBackend.DTO
 
         public string PatientName { get; set; }
 
+        public string patientPhone { get; set; }
+
         public string DoctorName { get; set; }
 
         public string SpecialtyName { get; set; }
