@@ -3,7 +3,6 @@ using ClinicBackend.Models;
 using ClinicBackend.DTO;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using ClinicBackend.DTO;
 
 namespace ClinicBackend.Controllers
 {
@@ -21,96 +20,88 @@ namespace ClinicBackend.Controllers
         }
 
         [HttpPost("generate")]
-        public async Task<IActionResult> GenerateSchedule([FromBody] GenerateScheduleDTO request)
+        public async Task<ActionResult<GenerateScheduleResponse>> GenerateSchedule(
+            [FromBody] GenerateScheduleRequest request)
         {
+            // Валидация
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            if (request.DoctorId == Guid.Empty)
+                return BadRequest("Не указан врач");
+
+            if (string.IsNullOrWhiteSpace(request.Date) ||
+                string.IsNullOrWhiteSpace(request.StartTime) ||
+                string.IsNullOrWhiteSpace(request.EndTime))
+                return BadRequest("Дата и время обязательны");
+
+            if (request.DurationMinutes < 15)
+                return BadRequest("Минимальная длительность приёма — 15 минут");
+
             try
             {
-                // Проверка существования врача
-                var doctor = await _context.Doctors.FindAsync(request.DoctorId);
-                if (doctor == null)
-                {
+                // Проверяем существование врача
+                var doctorExists = await _context.Doctors
+                    .AnyAsync(d => d.Id == request.DoctorId);
+
+                if (!doctorExists)
                     return NotFound("Врач не найден");
+
+                // Парсим дату
+                if (!DateTime.TryParseExact(request.Date, "yyyy-MM-dd",
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        System.Globalization.DateTimeStyles.None, out DateTime date))
+                {
+                    return BadRequest("Неверный формат даты. Ожидается: yyyy-MM-dd");
                 }
 
-                // Валидация времени
-                if (!TimeSpan.TryParse(request.StartTime, out var startTime) ||
-                    !TimeSpan.TryParse(request.EndTime, out var endTime))
+                // Парсим время
+                if (!DateTime.TryParse(request.StartTime, out DateTime startTime) ||
+                    !DateTime.TryParse(request.EndTime, out DateTime endTime))
                 {
-                    return BadRequest("Некорректный формат времени");
+                    return BadRequest("Неверный формат времени. Ожидается: HH:mm");
                 }
 
-                if (startTime >= endTime)
-                {
+                if (endTime <= startTime)
                     return BadRequest("Время окончания должно быть позже времени начала");
-                }
 
-                if (request.DurationMinutes <= 0)
-                {
-                    return BadRequest("Длительность приема должна быть положительной");
-                }
-
-                // Проверка на существующие слоты в эту дату
-                var existingSlots = await _context.ScheduleSlots
-                    .Where(s => s.DoctorId == request.DoctorId && s.Date == request.Date)
-                    .ToListAsync();
-
-                if (existingSlots.Any())
-                {
-                    return Conflict("Расписание для этого врача на выбранную дату уже существует");
-                }
+                int generatedCount = 0;
+                var currentTime = startTime;
 
                 // Генерация слотов
-                var generatedSlots = GenerateTimeSlots(
-                    request.Date,
-                    startTime,
-                    endTime,
-                    request.DurationMinutes,
-                    request.DoctorId);
+                while (currentTime.AddMinutes(request.DurationMinutes) <= endTime)
+                {
+                    var slot = new ScheduleSlot
+                    {
+                        Id = Guid.NewGuid(),
+                        DoctorId = request.DoctorId,
+                        Date = date,
+                        TimeFrom = currentTime,
+                        TimeTo = currentTime.AddMinutes(request.DurationMinutes),
+                        IsAvailable = true
+                    };
 
-                await _context.ScheduleSlots.AddRangeAsync(generatedSlots);
+                    _context.ScheduleSlots.Add(slot);
+                    currentTime = currentTime.AddMinutes(request.DurationMinutes);
+                    generatedCount++;
+                }
+
+                if (generatedCount == 0)
+                    return BadRequest("Не удалось создать ни одного слота. Проверьте интервал времени.");
+
                 await _context.SaveChangesAsync();
 
-                return Ok(new
+                return Ok(new GenerateScheduleResponse
                 {
-                    GeneratedCount = generatedSlots.Count,
-                    DoctorName = $"{doctor.LastName} {doctor.FirstName[0]}.",
-                    Date = request.Date
+                    GeneratedCount = generatedCount,
+                    Message = $"Успешно создано {generatedCount} слотов расписания."
                 });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Ошибка при генерации расписания");
-                return StatusCode(500, "Произошла ошибка при генерации расписания");
-            }
-        }
-
-        private List<ScheduleSlot> GenerateTimeSlots(
-            string date,
-            TimeSpan startTime,
-            TimeSpan endTime,
-            int durationMinutes,
-            string doctorId)
-        {
-            var slots = new List<ScheduleSlot>();
-            var currentTime = startTime;
-            var duration = TimeSpan.FromMinutes(durationMinutes);
-
-            while (currentTime + duration <= endTime)
-            {
-                slots.Add(new ScheduleSlot
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    DoctorId = doctorId,
-                    Date = date,
-                    TimeFrom = currentTime.ToString(@"hh\:mm"),
-                    TimeTo = (currentTime + duration).ToString(@"hh\:mm"),
-                    IsAvailable = true
-                });
-
-                currentTime = currentTime + duration;
-            }
-
-            return slots;
-        }
+                _logger.LogError(ex, "Ошибка генерации расписания для врача {DoctorId}", request.DoctorId);
+                return StatusCode(500, "Внутренняя ошибка сервера");
+            }        
+        }        
     }
 }

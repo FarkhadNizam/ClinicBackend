@@ -1,5 +1,6 @@
 ﻿// Controllers/MedicalVisitsController.cs
 using ClinicBackend.Data;
+using ClinicBackend.DTO;
 using ClinicBackend.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -15,192 +16,119 @@ public class MedicalVisitsController : ControllerBase
         _context = context;
     }
 
-    [HttpGet("patient/{patientId}")]
-    public async Task<ActionResult<IEnumerable<MedicalVisit>>> GetVisitsForPatient(string patientId)
+    [HttpGet("{appointmentId}/visit")]
+    public async Task<IActionResult> GetVisit(Guid appointmentId)
     {
-        return await _context.MedicalVisits
-            .Where(v => v.PatientId == patientId)
-            .Include(v => v.Doctor)
-            .ToListAsync();
-    }
+        var appointment = await _context.Appointments
+            .Include(a => a.Patient)
+            .Include(a => a.MedicalVisit)
+                .ThenInclude(v => v!.Diagnosis)
+            .FirstOrDefaultAsync(a => a.Id == appointmentId);
 
-    [HttpGet("{visitId}/{patientId}")]
-    public async Task<ActionResult<FullMedicalVisitDto>> GetVisitById(string visitId, string patientId)
-    {
-        var visit = await _context.MedicalVisits
-            .Include(v => v.Doctor)
-            .Include(v => v.Patient)
-            .FirstOrDefaultAsync(v => v.Id == visitId);
-
-        if (visit == null)
-        {
+        if (appointment == null)
             return NotFound();
+
+        // ========== История визитов ==========
+        var historyQuery = _context.MedicalVisits
+            .Include(v => v.Appointment)
+                .ThenInclude(a => a.Doctor)
+            .Include(v => v.Diagnosis)
+            .Where(v => v.Appointment.PatientId == appointment.PatientId);
+
+        // Исключаем текущий визит, если он уже существует
+        if (appointment.MedicalVisit != null)
+        {
+            historyQuery = historyQuery.Where(v => v.Id != appointment.MedicalVisit.Id);
         }
 
-        // Визит существует, возвращаем как обычно
-        var historyVisits = await _context.MedicalVisits
-            .Where(v => v.PatientId == visit.PatientId && v.Id != visit.Id && v.Status != "planned")
-            .Include(v => v.Doctor)
+        var history = await historyQuery
+            .OrderByDescending(v => v.Date)
+            .Take(20)
+            .Select(v => new MedicalVisitHistoryDto
+            {
+                Id = v.Id,
+                Date = v.Date,
+                Complaints = v.Complaints,
+                Treatment = v.Treatment,
+                DiagnosisName = v.Diagnosis != null ? v.Diagnosis.Name : null,
+                DoctorName = $"{v.Appointment.Doctor.LastName} {v.Appointment.Doctor.FirstName}"
+            })
             .ToListAsync();
 
-        var result = new FullMedicalVisitDto
+        // ========== Формируем ответ ==========
+        var result = new AppointmentVisitDto
         {
-            Id = visit.Id,
-            Date = visit.Date,
-            Complaints = visit.Complaints,
-            Diagnosis = visit.Diagnosis,
-            Treatment = visit.Treatment,
-            Status = visit.Status,
-            Doctor = new DoctorDto
-            {
-                Id = new Guid(visit.Doctor.Id),
-                FirstName = visit.Doctor.FirstName,
-                LastName = visit.Doctor.LastName,
-                Specialty = visit.Doctor.Specialty
-            },
+            AppointmentId = appointment.Id,
+
             Patient = new PatientDto
             {
-                Id = visit.Patient.Id,
-                FirstName = visit.Patient.FirstName,
-                LastName = visit.Patient.LastName,
-                BirthDate = visit.Patient.BirthDate,
-                InsuranceNumber = visit.Patient.InsuranceNumber,
-                Phone = visit.Patient.Phone
+                Id = appointment.Patient.Id,
+                FirstName = appointment.Patient.FirstName,
+                LastName = appointment.Patient.LastName,
+                BirthDate = appointment.Patient.BirthDate,
+                Phone = appointment.Patient.Phone,
+                InsuranceNumber = appointment.Patient.InsuranceNumber
             },
-            History = historyVisits.Select(h => new MedicalVisitDto
+
+            Visit = appointment.MedicalVisit == null ? null : new MedicalVisitDto
             {
-                Id = h.Id,
-                Date = h.Date,
-                Complaints = h.Complaints,
-                Diagnosis = h.Diagnosis,
-                Treatment = h.Treatment,
-                Status = h.Status,
-                Doctor = new DoctorDto
-                {
-                    Id = new Guid(h.Doctor.Id),
-                    FirstName = h.Doctor.FirstName,
-                    LastName = h.Doctor.LastName,
-                    Specialty = h.Doctor.Specialty
-                }
-            }).ToList()
+                Id = appointment.MedicalVisit.Id,
+                Date = appointment.MedicalVisit.Date,
+                Complaints = appointment.MedicalVisit.Complaints,
+                Treatment = appointment.MedicalVisit.Treatment,
+                DiagnosisId = appointment.MedicalVisit.DiagnosisId,
+                DiagnosisName = appointment.MedicalVisit.Diagnosis?.Name,
+                DiagnosisCode = appointment.MedicalVisit.Diagnosis?.MkbCode
+            },
+
+            History = history
         };
 
-        return result;
+        return Ok(result);
     }
 
-
-
-    [HttpPut("{id}")]
-    public async Task<ActionResult> UpdateVisit(string id, [FromBody] UpdateMedicalVisitDto visitDto)
+    [HttpPost("{appointmentId}/visit")]
+    public async Task<IActionResult> CreateVisit(Guid appointmentId, [FromBody] CreateMedicalVisitDto dto)
     {
-        var existing = await _context.MedicalVisits.FindAsync(id);
-        if (existing == null)
+        var appointment = await _context.Appointments
+            .FirstOrDefaultAsync(a => a.Id == appointmentId);
+
+        if (appointment == null) return NotFound();
+        if (appointment.MedicalVisit != null) return BadRequest("Прием уже оформлен");
+
+        var visit = new MedicalVisit
         {
-            return NotFound();
-        }
+            Id = Guid.NewGuid(),
+            AppointmentId = appointmentId,
+            Complaints = dto.Complaints,
+            DiagnosisId = dto.DiagnosisId,
+            Treatment = dto.Treatment,
+            Date = DateTime.UtcNow
+        };
 
-        existing.Complaints = visitDto.Complaints;
-        existing.Diagnosis = visitDto.Diagnosis;
-        existing.Treatment = visitDto.Treatment;
-        existing.Status = visitDto.Status;
+        appointment.status = Appointment.Status.Completed;
 
+        _context.MedicalVisits.Add(visit);
         await _context.SaveChangesAsync();
+
         return Ok();
     }
 
-    [HttpPost]
-    public async Task<ActionResult<MedicalVisit>> CreateVisit([FromBody] CreateMedicalVisitDto visitDto)
+    [HttpPut("{appointmentId}/visit")]
+    public async Task<IActionResult> UpdateVisit(Guid appointmentId, [FromBody] UpdateMedicalVisitDto dto)
     {
-        try
-        {
-            // Проверяем существование пациента и доктора
-            var patient = await _context.Patients.FindAsync(visitDto.PatientId);
-            if (patient == null)
-                return BadRequest("Пациент не найден");
+        var visit = await _context.MedicalVisits
+            .FirstOrDefaultAsync(v => v.AppointmentId == appointmentId);
 
-            var doctor = await _context.Doctors.FindAsync(visitDto.DoctorId);
-            if (doctor == null)
-                return BadRequest("Доктор не найден");
+        if (visit == null) return NotFound("Прием не найден");
 
-            var visit = new MedicalVisit
-            {
-                Id = Guid.NewGuid().ToString(),
-                Date = DateTime.UtcNow.ToString("o"),
-                Complaints = visitDto.Complaints,
-                Diagnosis = visitDto.Diagnosis,
-                Treatment = visitDto.Treatment,
-                Status = visitDto.Status,
-                PatientId = visitDto.PatientId,
-                DoctorId = visitDto.DoctorId
-            };
+        visit.Complaints = dto.Complaints;
+        visit.DiagnosisId = dto.DiagnosisId;
+        visit.Treatment = dto.Treatment;
+        visit.Date = DateTime.UtcNow; // обновляем дату редактирования
 
-            _context.MedicalVisits.Add(visit);
-            await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync();
 
-            // Возвращаем созданный визит с кодом 200 OK
-            return Ok(visitDto);
-        }
-        catch (Exception ex)
-        {
-            // Логируем ошибку
-            Console.WriteLine($"Ошибка при создании визита: {ex.Message}");
-            return StatusCode(500, "Внутренняя ошибка сервера");
-        }
-    }
-
-    public class UpdateMedicalVisitDto
-    {
-        public string Complaints { get; set; }
-        public string Diagnosis { get; set; }
-        public string Treatment { get; set; }
-        public string Status { get; set; }
-    }
-
-    public class CreateMedicalVisitDto
-    {
-        public string PatientId { get; set; }
-        public string DoctorId { get; set; }
-        public string Complaints { get; set; }
-        public string Diagnosis { get; set; }
-        public string Treatment { get; set; }
-        public string Status { get; set; } = "completed";
-    }
-}
-
-
-public class PatientDto
-{
-    public string Id { get; set; }
-    public string FirstName { get; set; }
-    public string LastName { get; set; }
-    public string BirthDate { get; set; }
-    public string InsuranceNumber { get; set; }
-    public string Phone { get; set; }
-}
-
-public class MedicalVisitDto
-{
-    public string Id { get; set; }
-    public string Date { get; set; }
-    public string Complaints { get; set; }
-    public string Diagnosis { get; set; }
-    public string Treatment { get; set; }
-    public string Status { get; set; }
-
-    public DoctorDto Doctor { get; set; }
-}
-
-public class FullMedicalVisitDto
-{
-    public string Id { get; set; }
-    public string Date { get; set; }
-    public string Complaints { get; set; }
-    public string Diagnosis { get; set; }
-    public string Treatment { get; set; }
-    public string Status { get; set; }
-
-    public DoctorDto Doctor { get; set; }
-    public PatientDto Patient { get; set; }
-
-    public List<MedicalVisitDto> History { get; set; }
+        return Ok();
+    }    
 }

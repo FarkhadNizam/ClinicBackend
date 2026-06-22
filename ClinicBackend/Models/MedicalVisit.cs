@@ -2,18 +2,13 @@
 {
     public class MedicalVisit
     {
-        public string Id { get; set; }
-        public string PatientId { get; set; }
-        public Patient Patient { get; set; }
-
-        public string DoctorId { get; set; }
-        public Doctor Doctor { get; set; }
-
-        public string Date { get; set; }
+        public Guid Id { get; set; }
+        public Guid AppointmentId { get; set; }
+        public Appointment Appointment { get; set; }
+        public DateTime Date { get; set; }
         public string Complaints { get; set; }
-        public string Diagnosis { get; set; }
+        public Guid DiagnosisId { get; set; }
+        public Diagnosis Diagnosis { get; set; }
         public string Treatment { get; set; }
-        public string Status { get; set; } // completed/planned
     }
-
 }

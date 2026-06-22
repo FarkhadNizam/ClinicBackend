@@ -30,7 +30,7 @@ namespace ClinicBackend.Controllers
 
                 var patient = new Patient
                 {
-                    Id = Guid.NewGuid().ToString(),
+                    Id = Guid.NewGuid(),
                     FirstName = patientDto.FirstName,
                     LastName = patientDto.LastName,
                     BirthDate = patientDto.BirthDate,
@@ -71,40 +71,5 @@ namespace ClinicBackend.Controllers
                 })
                 .ToListAsync();
         }
-    }
-
-    public class PatientDTO
-    {
-        [Required]
-        public string Id { get; set; }
-
-        [Required]
-        public string FirstName { get; set; }
-
-        [Required]
-        public string LastName { get; set; }
-
-        [Required]
-        public string BirthDate { get; set; }
-
-        public string? Phone { get; set; }
-
-        public string? InsuranceNumber { get; set; }
-    }
-
-    public class CreatePatientDTO
-    {
-        [Required]
-        public string FirstName { get; set; }
-
-        [Required]
-        public string LastName { get; set; }
-
-        [Required]
-        public string BirthDate { get; set; }
-
-        public string? Phone { get; set; }
-
-        public string? InsuranceNumber { get; set; }
-    }
+    }   
 }

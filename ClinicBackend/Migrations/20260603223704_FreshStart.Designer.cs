@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ClinicBackend.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20250528121323_Fix_PatientIdType")]
-    partial class Fix_PatientIdType
+    [Migration("20260603223704_FreshStart")]
+    partial class FreshStart
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -31,26 +31,30 @@ namespace ClinicBackend.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTime?>("ActualEndTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ActualStartTime")
+                        .HasColumnType("datetime2");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<Guid>("DoctorId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<string>("DoctorId1")
-                        .HasColumnType("nvarchar(450)");
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uniqueidentifier");
 
-                    b.Property<string>("PatientId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
+                    b.Property<Guid>("ScheduleSlotId")
+                        .HasColumnType("uniqueidentifier");
 
-                    b.Property<string>("ScheduleSlotId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
+                    b.Property<int>("status")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("DoctorId1");
+                    b.HasIndex("DoctorId");
 
                     b.HasIndex("PatientId");
 
@@ -61,8 +65,9 @@ namespace ClinicBackend.Migrations
 
             modelBuilder.Entity("ClinicBackend.Models.Doctor", b =>
                 {
-                    b.Property<string>("Id")
-                        .HasColumnType("nvarchar(450)");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Avatar")
                         .HasColumnType("nvarchar(max)");
@@ -86,30 +91,21 @@ namespace ClinicBackend.Migrations
 
             modelBuilder.Entity("ClinicBackend.Models.MedicalVisit", b =>
                 {
-                    b.Property<string>("Id")
-                        .HasColumnType("nvarchar(450)");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AppointmentId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Complaints")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Date")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("Diagnosis")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("DoctorId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<string>("PatientId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
@@ -119,21 +115,19 @@ namespace ClinicBackend.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("DoctorId");
-
-                    b.HasIndex("PatientId");
+                    b.HasIndex("AppointmentId");
 
                     b.ToTable("MedicalVisits");
                 });
 
             modelBuilder.Entity("ClinicBackend.Models.Patient", b =>
                 {
-                    b.Property<string>("Id")
-                        .HasColumnType("nvarchar(450)");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
 
-                    b.Property<string>("BirthDate")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<DateTime>("BirthDate")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("FirstName")
                         .IsRequired()
@@ -156,27 +150,24 @@ namespace ClinicBackend.Migrations
 
             modelBuilder.Entity("ClinicBackend.Models.ScheduleSlot", b =>
                 {
-                    b.Property<string>("Id")
-                        .HasColumnType("nvarchar(450)");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
 
-                    b.Property<string>("Date")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("datetime2");
 
-                    b.Property<string>("DoctorId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
+                    b.Property<Guid>("DoctorId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<bool>("IsAvailable")
                         .HasColumnType("bit");
 
-                    b.Property<string>("TimeFrom")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<DateTime>("TimeFrom")
+                        .HasColumnType("datetime2");
 
-                    b.Property<string>("TimeTo")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<DateTime>("TimeTo")
+                        .HasColumnType("datetime2");
 
                     b.HasKey("Id");
 
@@ -210,13 +201,15 @@ namespace ClinicBackend.Migrations
             modelBuilder.Entity("ClinicBackend.Models.Appointment", b =>
                 {
                     b.HasOne("ClinicBackend.Models.Doctor", "Doctor")
-                        .WithMany()
-                        .HasForeignKey("DoctorId1");
+                        .WithMany("Appointments")
+                        .HasForeignKey("DoctorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.HasOne("ClinicBackend.Models.Patient", "Patient")
-                        .WithMany()
+                        .WithMany("Appointments")
                         .HasForeignKey("PatientId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("ClinicBackend.Models.ScheduleSlot", "ScheduleSlot")
@@ -234,21 +227,13 @@ namespace ClinicBackend.Migrations
 
             modelBuilder.Entity("ClinicBackend.Models.MedicalVisit", b =>
                 {
-                    b.HasOne("ClinicBackend.Models.Doctor", "Doctor")
-                        .WithMany("Visits")
-                        .HasForeignKey("DoctorId")
+                    b.HasOne("ClinicBackend.Models.Appointment", "Appointment")
+                        .WithMany()
+                        .HasForeignKey("AppointmentId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("ClinicBackend.Models.Patient", "Patient")
-                        .WithMany("Visits")
-                        .HasForeignKey("PatientId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Doctor");
-
-                    b.Navigation("Patient");
+                    b.Navigation("Appointment");
                 });
 
             modelBuilder.Entity("ClinicBackend.Models.ScheduleSlot", b =>
@@ -256,7 +241,7 @@ namespace ClinicBackend.Migrations
                     b.HasOne("ClinicBackend.Models.Doctor", "Doctor")
                         .WithMany("Slots")
                         .HasForeignKey("DoctorId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Doctor");
@@ -264,14 +249,14 @@ namespace ClinicBackend.Migrations
 
             modelBuilder.Entity("ClinicBackend.Models.Doctor", b =>
                 {
-                    b.Navigation("Slots");
+                    b.Navigation("Appointments");
 
-                    b.Navigation("Visits");
+                    b.Navigation("Slots");
                 });
 
             modelBuilder.Entity("ClinicBackend.Models.Patient", b =>
                 {
-                    b.Navigation("Visits");
+                    b.Navigation("Appointments");
                 });
 #pragma warning restore 612, 618
         }

@@ -13,5 +13,6 @@
         public string Login { get; set; }
         public string PasswordHash { get; set; }
         public UserRole Role { get; set; }
+        public Doctor? Doctor { get; set; }
     }
 }

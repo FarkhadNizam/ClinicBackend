@@ -4,7 +4,7 @@ using BCrypt.Net;
 using ClinicBackend.Data;
 using ClinicBackend.Models;
 
-namespace YourNamespace.Data
+namespace ClinicBackend.Data
 {
     public static class DbInitializer
     {
@@ -26,57 +26,57 @@ namespace YourNamespace.Data
 
             if (!context.Doctors.Any())
             {
-                var doctors = new[]
-                {
-                    new Doctor { Id = Guid.NewGuid().ToString(), FirstName = "Иван", LastName = "Иванов", Specialty = "Терапевт" },
-                    new Doctor { Id = Guid.NewGuid().ToString(), FirstName = "Петр", LastName = "Петров", Specialty = "Кардиолог" },
-                    new Doctor { Id = Guid.NewGuid().ToString(), FirstName = "Анна", LastName = "Сидорова", Specialty = "Невролог" }
-                };
-                context.Doctors.AddRange(doctors);
-                context.SaveChanges();
+                //var doctors = new[]
+                //{
+                //    new Doctor { Id = Guid.NewGuid(), FirstName = "Иван", LastName = "Иванов", Specialty = "Терапевт" },
+                //    new Doctor { Id = Guid.NewGuid(), FirstName = "Петр", LastName = "Петров", Specialty = "Кардиолог" },
+                //    new Doctor { Id = Guid.NewGuid(), FirstName = "Анна", LastName = "Сидорова", Specialty = "Невролог" }
+                //};
+                //context.Doctors.AddRange(doctors);
+                //context.SaveChanges();
             }
 
-            if (!context.Patients.Any())
-            {
-                var patients = new[]
-                {
-                    new Patient { Id = Guid.NewGuid().ToString(), FirstName = "Алексей", LastName = "Смирнов", BirthDate = "1990-05-20", Phone = "123-456-7890" },
-                    new Patient { Id = Guid.NewGuid().ToString(), FirstName = "Мария", LastName = "Кузнецова", BirthDate = "1985-10-10", Phone = "234-567-8901" },
-                    new Patient { Id = Guid.NewGuid().ToString(), FirstName = "Дмитрий", LastName = "Соколов", BirthDate = "2000-01-15", Phone = "345-678-9012" }
-                };
-                context.Patients.AddRange(patients);
-                context.SaveChanges();
-            }
+            //if (!context.Patients.Any())
+            //{
+            //    var patients = new[]
+            //    {
+            //        new Patient { Id = Guid.NewGuid(), FirstName = "Алексей", LastName = "Смирнов", BirthDate = "1990-05-20", Phone = "123-456-7890" },
+            //        new Patient { Id = Guid.NewGuid(), FirstName = "Мария", LastName = "Кузнецова", BirthDate = "1985-10-10", Phone = "234-567-8901" },
+            //        new Patient { Id = Guid.NewGuid(), FirstName = "Дмитрий", LastName = "Соколов", BirthDate = "2000-01-15", Phone = "345-678-9012" }
+            //    };
+            //    context.Patients.AddRange(patients);
+            //    context.SaveChanges();
+            //}
 
-            if (!context.ScheduleSlots.Any())
-            {
-                var doctors = context.Doctors.ToList();
-                var dates = new[] { "2025-05-26", "2025-05-27" };
+            //if (!context.ScheduleSlots.Any())
+            //{
+            //    var doctors = context.Doctors.ToList();
+            //    var dates = new[] { "2025-05-26", "2025-05-27" };
 
-                foreach (var doctor in doctors)
-                {
-                    foreach (var date in dates)
-                    {
-                        for (int hour = 9; hour < 17; hour++)
-                        {
-                            var from = $"{hour:D2}:00";
-                            var to = $"{hour + 1:D2}:00";
+            //    foreach (var doctor in doctors)
+            //    {
+            //        foreach (var date in dates)
+            //        {
+            //            for (int hour = 9; hour < 17; hour++)
+            //            {
+            //                var from = $"{hour:D2}:00";
+            //                var to = $"{hour + 1:D2}:00";
 
-                            context.ScheduleSlots.Add(new ScheduleSlot
-                            {
-                                Id = Guid.NewGuid().ToString(),
-                                DoctorId = doctor.Id,
-                                Date = date,
-                                TimeFrom = from,
-                                TimeTo = to,
-                                IsAvailable = true
-                            });
-                        }
-                    }
-                }
+            //                context.ScheduleSlots.Add(new ScheduleSlot
+            //                {
+            //                    Id = Guid.NewGuid(),
+            //                    DoctorId = doctor.Id,
+            //                    Date = date,
+            //                    TimeFrom = from,
+            //                    TimeTo = to,
+            //                    IsAvailable = true
+            //                });
+            //            }
+            //        }
+            //    }
 
-                context.SaveChanges();
-            }
+            //    context.SaveChanges();
+            //}
         }
     }
 }
